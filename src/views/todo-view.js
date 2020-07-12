@@ -4,14 +4,11 @@ import '@vaadin/vaadin-button';
 import '@vaadin/vaadin-checkbox';
 import '@vaadin/vaadin-radio-button/vaadin-radio-button';
 import '@vaadin/vaadin-radio-button/vaadin-radio-group';
-
-const visibilityFilters = {
-    SHOW_ALL: 'All',
-    SHOW_ACTIVE: 'Active',
-    SHOW_COMPLETED: 'Completed',
-};
-
-class TodoView extends LitElement {
+import { connect } from 'pwa-helpers';
+import { visibilityFilters, getVisibleTodosSelector } from '../redux/reducer';
+import { store } from '../redux/store';
+import { addTodo, updateTodoStatus, updateFilter, clearCompleted } from '../redux/actions';
+class TodoView extends connect(store)(LitElement) {
 
     static get properties() {
         return {
@@ -21,12 +18,10 @@ class TodoView extends LitElement {
         }
     };
 
-    constructor() {
-        super();
-        this.todos = [];
-        this.filter = visibilityFilters.SHOW_ALL;
-        this.task = '';
-    };
+    stateChanged(state) {
+        this.todos = getVisibleTodosSelector(state);
+        this.filter = state.filter;
+    }
 
     updateTask(e) {
         this.task = e.target.value;
@@ -34,10 +29,7 @@ class TodoView extends LitElement {
 
     addTodo() {
         if(this.task) {
-            this.todos = [ ...this.todos, {
-                task: this.task,
-                complete: false
-            }];
+            store.dispatch(addTodo(this.task));
             this.task = '';
         }
     };
@@ -49,28 +41,15 @@ class TodoView extends LitElement {
     };
 
     updateTodoStatus(updatedTodo, complete) {
-        this.todos = this.todos.map(todo => 
-            updatedTodo === todo ? { ...updatedTodo, complete } : todo
-        );
+        store.dispatch(updateTodoStatus(updatedTodo, complete));
     };
 
     filterChanged(e) {
-        this.filter = e.target.value
-    };
-
-    applyFilter(todos) {
-        switch (this.filter) {
-            case visibilityFilters.SHOW_ACTIVE:
-                return todos.filter(todo => !todo.complete);
-            case visibilityFilters.SHOW_COMPLETED:
-                return todos.filter(todo => todo.complete);
-            default:
-                return todos;
-        }
+        store.dispatch(updateFilter(e.detail.value));
     };
 
     clearCompleted() {
-        this.todos = this.todos.filter(todo => !todo.complete);
+        store.dispatch(clearCompleted());
     };
 
     createRenderRoot() {
@@ -103,7 +82,7 @@ class TodoView extends LitElement {
             <div class="input-layout" @keyup="${this.shortcutListener}">
                 <vaadin-text-field
                     placeholder="Task"
-                    value="${this.task}"
+                    value="${this.task || ''}"
                     @change="${this.updateTask}"
                 ></vaadin-text-field>
                 <vaadin-button
@@ -114,7 +93,7 @@ class TodoView extends LitElement {
 
             <div class="todos-list">
                 ${
-                    this.applyFilter(this.todos).map(todo => html`
+                    this.todos.map(todo => html`
                     <div class="todo-item">
                         <vaadin-checkbox
                             ?checked="${todo.complete}"
